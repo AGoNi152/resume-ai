@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- SEO & Sharing Metadata -->
+    <title>盛宸亮 | 交互式简历</title>
+    <meta name="description" content="盛宸亮的交互式简历 - 国际经济与贸易专业本科生，研究员，校园领袖" />
+    <meta name="theme-color" content="#171717" />
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="盛宸亮 | 交互式简历" />
+    <meta property="og:description" content="查看盛宸亮的交互式书页风格简历，包含详细的研究、经济和校园领导经验。" />
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        background-color: #f5f5f5;
+        color: #171717;
+        margin: 0;
+        overflow-x: hidden;
+      }
+      
+      /* Flowing Background */
+      .flowing-bg {
+        background: linear-gradient(-45deg, #e5e5e5, #ffffff, #d4d4d4, #f0f0f0);
+        background-size: 400% 400%;
+        animation: gradientBG 15s ease infinite;
+      }
+
+      @keyframes gradientBG {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+
+      /* Chat Widget Animation */
+      .chat-enter {
+        animation: chatSlideIn 0.3s ease-out;
+      }
+      
+      @keyframes chatSlideIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px) scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      
+      .message-bubble {
+        animation: messagePop 0.2s ease-out;
+      }
+      
+      @keyframes messagePop {
+        from {
+          opacity: 0;
+          transform: scale(0.9);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      /* === PRINT STYLES === */
+      @media print {
+        @page { margin: 1cm; size: auto; }
+        
+        body {
+          background: white !important;
+          color: black !important;
+          overflow: visible !important;
+          height: auto !important;
+        }
+
+        .no-print {
+          display: none !important;
+        }
+
+        .print-only {
+          display: block !important;
+        }
+        
+        * {
+          -webkit-print-color-adjust: exact !important;
+          color-adjust: exact !important;
+        }
+        
+        a { text-decoration: none; color: black; }
+      }
+
+      .print-only {
+        display: none;
+      }
+
+      /* Typing Indicator */
+      .typing-indicator {
+        display: flex;
+        gap: 4px;
+        padding: 12px 16px;
+      }
+      
+      .typing-indicator span {
+        width: 8px;
+        height: 8px;
+        background: #9ca3af;
+        border-radius: 50%;
+        animation: typing 1.4s infinite ease-in-out both;
+      }
+      
+      .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+      .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+      
+      @keyframes typing {
+        0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+        40% { transform: scale(1); opacity: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+      const { useState, useEffect, useRef } = React;
+      
+      // Icon components using Lucide
+      const Icon = ({ name, size = 16, className = "" }) => {
+        const iconRef = useRef(null);
+        
+        useEffect(() => {
+          if (iconRef.current && window.lucide) {
+            iconRef.current.innerHTML = '';
+            const icon = window.lucide.createElement(window.lucide.icons[name]);
+            if (icon) {
+              icon.setAttribute('width', size);
+              icon.setAttribute('height', size);
+              iconRef.current.appendChild(icon);
+            }
+          }
+        }, [name, size]);
+        
+        return <span ref={iconRef} className={className} />;
+      };
+
+      // AI Chat Widget Component
+      const AIChatWidget = ({ lang }) => {
+        const [isOpen, setIsOpen] = useState(false);
+        const [messages, setMessages] = useState([
+          { role: 'assistant', content: lang === 'en' ? 
+            "Hi! I'm an AI assistant. Ask me anything about Sheng Chenliang's experience, skills, or background!" : 
+            "你好！我是AI助手。可以问我关于盛宸亮的工作经历、技能或背景的任何问题！" }
+        ]);
+        const [inputValue, setInputValue] = useState('');
+        const [isLoading, setIsLoading] = useState(false);
+        const messagesEndRef = useRef(null);
+
+        const scrollToBottom = () => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        };
+
+        useEffect(() => {
+          scrollToBottom();
+        }, [messages]);
+
+        const [apiKey, setApiKey] = useState('');
+        const [showKeyInput, setShowKeyInput] = useState(false);
+
+        const handleSend = async () => {
+          if (!inputValue.trim() || isLoading) return;
+          
+          const userMessage = inputValue.trim();
+          setInputValue('');
+          setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+          setIsLoading(true);
+
+          // If no API key, use local response directly
+          if (!apiKey.trim()) {
+            const fallbackResponse = generateLocalResponse(userMessage, lang);
+            setMessages(prev => [...prev, { role: 'assistant', content: fallbackResponse }]);
+            setIsLoading(false);
+            return;
+          }
+
+          try {
+            const response = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey.trim()}`
+              },
+              body: JSON.stringify({
+                model: 'Qwen/Qwen2.5-7B-Instruct',
+                messages: [
+                  {
+                    role: 'system',
+                    content: `You are an AI assistant for Sheng Chenliang's resume. Answer questions about his background based on this information:
+                    
+Name: 盛宸亮 (Sheng Chenliang)
+Birth: 2004-04, Male, Han
+Phone: 17602199148
+Email: 2023212716@mail.hfut.edu.cn
+School: 合肥工业大学 (Hefei University of Technology, 211), International Economics and Trade (本科)
+
+Education:
+- 2023-09 to Present: Hefei University of Technology (211), International Economics and Trade
+- Core Courses: Money & Banking (98.5), Linear Algebra (95), Political Economy (92), Economic Law, Accounting, Data Mining & MATLAB
+- Coursera: Python Basics (Univ. of Michigan), Data Analysis with R
+
+Research Experience:
+1. Contract Design for Repurchasing Computational Power (2024.03-2025.05) - 2nd Author, Published in IJTCS-FALL 2025
+   - Designed repurchase mechanism for cloud computing GPU utilization
+   - Wrote Introduction and conducted code reproduction
+   
+2. Economic Analysis of Antibiotic Treatment Regimens (2025.06-Present) - 1st Author
+   - Two-stage BCC game DEA model
+   - 7 key indicators, 10 antibiotic regimens
+   - 1,000 Monte Carlo simulations with MATLAB
+
+Internship Experience:
+1. Shanghai University of TCM (2025.01-2025.02) - Center for Quantitative Pharmacology, Research Assistant
+   - Pharmacoeconomics literature review and analysis
+   
+2. NetEase News (2025.09-2025.10) - Content Operations, Project Lead
+   - "School Creator" activity
+   - 130k+ total reads, 50k+ single post peak
+
+Campus Experience:
+1. School New Media Center - Director
+   - 100+ posts, 100k+ total reads
+   - Ranked 1st in university's online political education assessment
+   
+2. Speech & Debate Association - Team Leader
+   - University Debate Champion (vs 20 teams)
+   - "Capybara Cup" Online Debate Champion & Best Debater (vs 48 teams)
+   - Trained 100+ members
+
+Skills: R, Python, MATLAB, PPT, Excel
+Interests: Long-distance running, Photography, Debate
+
+Awards:
+- Anhui College Students Int'l Trade Comprehensive Skills Competition - First Prize (Feb 2025)
+- 8th Anhui College Students Int'l Business Simulated Negotiation Competition - First Prize (Dec 2025)
+- Project Practice Excellence Award (NetEase News, Oct 2025)
+- IELTS Academic 7.0 (Dec 21, 2025): R8.0, L7.0, S6.5, W6.5
+
+Answer in the same language as the user's question (Chinese or English). Be professional and concise.`
+                  },
+                  ...messages.map(m => ({ role: m.role, content: m.content })),
+                  { role: 'user', content: userMessage }
+                ],
+                max_tokens: 512,
+                temperature: 0.7
+              })
+            });
+
+            if (!response.ok) {
+              throw new Error('API request failed');
+            }
+
+            const data = await response.json();
+            const aiResponse = data.choices[0]?.message?.content || 
+              (lang === 'en' ? "Sorry, I couldn't process that request." : "抱歉，我无法处理该请求。");
+            
+            setMessages(prev => [...prev, { role: 'assistant', content: aiResponse }]);
+          } catch (error) {
+            // Fallback to local response if API fails
+            const fallbackResponse = generateLocalResponse(userMessage, lang);
+            setMessages(prev => [...prev, { role: 'assistant', content: fallbackResponse }]);
+          } finally {
+            setIsLoading(false);
+          }
+        };
+
+        const generateLocalResponse = (question, lang) => {
+          const q = question.toLowerCase();
+          
+          if (q.includes('name') || q.includes('名字') || q.includes('姓名')) {
+            return lang === 'en' ? "His name is Sheng Chenliang (盛宸亮)." : "他的名字是盛宸亮。";
+          }
+          if (q.includes('school') || q.includes('学校') || q.includes('大学')) {
+            return lang === 'en' ? "He studies at Hefei University of Technology (合肥工业大学), a Project 211 university." : "他就读于合肥工业大学（211工程大学）。";
+          }
+          if (q.includes('major') || q.includes('专业')) {
+            return lang === 'en' ? "He majors in International Economics and Trade (国际经济与贸易)." : "他的专业是国际经济与贸易。";
+          }
+          if (q.includes('skill') || q.includes('技能') || q.includes('会什么')) {
+            return lang === 'en' ? "His skills include: R, Python, MATLAB, PPT, and Excel." : "他的技能包括：R、Python、MATLAB、PPT 和 Excel。";
+          }
+          if (q.includes('research') || q.includes('科研') || q.includes('论文')) {
+            return lang === 'en' ? "He has two research projects: (1) Contract Design for Repurchasing Computational Power (2nd author, published in IJTCS-FALL 2025), and (2) Economic Analysis of Antibiotic Treatment Regimens (1st author, ongoing)." : 
+            "他有两个科研项目：(1) 算力回购契约设计（第二作者，已发表于IJTCS-FALL 2025），(2) 抗生素治疗方案经济效益分析（第一作者，进行中）。";
+          }
+          if (q.includes('internship') || q.includes('实习')) {
+            return lang === 'en' ? "He has interned at Shanghai University of TCM (Research Assistant) and NetEase News (Content Operations)." : 
+            "他曾在上海中医药大学（研究助理）和网易新闻（内容运营）实习。";
+          }
+          if (q.includes('award') || q.includes('prize') || q.includes('获奖') || q.includes('荣誉')) {
+            return lang === 'en' ? "His awards include: Anhui Int'l Trade Competition First Prize, Anhui Business Negotiation Competition First Prize, IELTS 7.0, and NetEase Project Excellence Award." : 
+            "他的获奖包括：安徽省国际贸易综合技能大赛一等奖、安徽省国际商务模拟谈判大赛一等奖、雅思7.0、网易项目实践优秀证明。";
+          }
+          if (q.includes('contact') || q.includes('phone') || q.includes('email') || q.includes('联系')) {
+            return lang === 'en' ? "Phone: 17602199148, Email: 2023212716@mail.hfut.edu.cn" : "电话：17602199148，邮箱：2023212716@mail.hfut.edu.cn";
+          }
+          
+          return lang === 'en' ? 
+            "I'm not sure about that. Please check the resume details or ask about his education, research, internships, or skills!" : 
+            "我不太确定。请查看简历详情，或询问他的教育背景、科研经历、实习经历或技能！";
+        };
+
+        const handleKeyPress = (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+          }
+        };
+
+        return (
+          <div className="no-print">
+            {/* Chat Toggle Button */}
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-black text-white rounded-full shadow-lg hover:scale-110 transition-transform flex items-center justify-center"
+              title={lang === 'en' ? 'Ask AI about this resume' : '向AI询问简历相关问题'}
+            >
+              <Icon name={isOpen ? "X" : "MessageCircle"} size={24} />
+            </button>
+
+            {/* Chat Window */}
+            {isOpen && (
+              <div className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 chat-enter overflow-hidden">
+                {/* API Key Input Modal */}
+                {showKeyInput && (
+                  <div className="absolute inset-0 bg-white z-20 p-4">
+                    <h3 className="font-bold text-lg mb-2">{lang === 'en' ? 'Configure AI' : '配置AI'}</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      {lang === 'en' 
+                        ? 'Enter your SiliconFlow API Key for smarter responses. Leave empty to use local knowledge base.' 
+                        : '输入 SiliconFlow API Key 获得更智能的回答。留空则使用本地知识库。'}
+                    </p>
+                    <input
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder={lang === 'en' ? 'sk-...' : '在此输入API Key'}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3 focus:outline-none focus:border-black"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowKeyInput(false)}
+                        className="flex-1 bg-black text-white py-2 rounded-lg text-sm font-medium hover:opacity-90"
+                      >
+                        {lang === 'en' ? 'Save' : '保存'}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-3">
+                      {lang === 'en' ? 'Get free API Key at: ' : '免费获取 Key：'}
+                      <a href="https://siliconflow.cn/" target="_blank" rel="noreferrer" className="underline">siliconflow.cn</a>
+                    </p>
+                  </div>
+                )}
+                {/* Header */}
+                <div className="bg-black text-white px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${apiKey ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
+                    <span className="font-semibold text-sm">
+                      {lang === 'en' ? 'AI Assistant' : 'AI助手'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">
+                      {apiKey ? (lang === 'en' ? 'Online' : '在线') : (lang === 'en' ? 'Local' : '本地')}
+                    </span>
+                    <button
+                      onClick={() => setShowKeyInput(true)}
+                      className="text-gray-400 hover:text-white transition-colors"
+                      title={lang === 'en' ? 'Settings' : '设置'}
+                    >
+                      <Icon name="Settings" size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Messages */}
+                <div className="h-80 overflow-y-auto p-4 space-y-3 bg-gray-50">
+                  {messages.map((msg, idx) => (
+                    <div key={idx} className={`message-bubble flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm ${
+                        msg.role === 'user' 
+                          ? 'bg-black text-white rounded-br-md' 
+                          : 'bg-white text-gray-800 border border-gray-200 rounded-bl-md shadow-sm'
+                      }`}>
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-white border border-gray-200 rounded-2xl rounded-bl-md shadow-sm">
+                        <div className="typing-indicator">
+                          <span></span>
+                          <span></span>
+                          <span></span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input */}
+                <div className="p-3 border-t border-gray-200 bg-white">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      placeholder={lang === 'en' ? 'Ask anything...' : '输入问题...'}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-full text-sm focus:outline-none focus:border-black transition-colors"
+                    />
+                    <button
+                      onClick={handleSend}
+                      disabled={isLoading || !inputValue.trim()}
+                      className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 transition-transform"
+                    >
+                      <Icon name="Send" size={16} />
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2 text-center">
+                    {lang === 'en' ? 'Powered by AI • May produce inaccurate information' : '由AI驱动 • 可能产生不准确的信息'}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      // Section Component
+      const Section = ({ title, children, className = '' }) => {
+        return (
+          <section className={`mb-10 ${className}`}>
+            <h2 className="text-xl font-bold tracking-tight uppercase border-b-2 border-black pb-2 mb-6">
+              {title}
+            </h2>
+            <div className="space-y-6">
+              {children}
+            </div>
+          </section>
+        );
+      };
+
+      // Main App Component
+      const App = () => {
+        const [currentPage, setCurrentPage] = useState(0);
+        const [lang, setLang] = useState('zh');
+
+        const nextPage = () => setCurrentPage(1);
+        const prevPage = () => setCurrentPage(0);
+        const toggleLang = () => setLang(l => l === 'en' ? 'zh' : 'en');
+        const handlePrint = () => window.print();
+
+        // Theme helpers
+        const getTheme = (isDark) => ({
+          bg: isDark ? 'bg-zinc-800/95 backdrop-blur-sm' : '',
+          text: isDark ? 'text-white' : 'text-neutral-900',
+          subtext: isDark ? 'text-zinc-400' : 'text-neutral-500',
+          border: isDark ? 'border-zinc-700' : 'border-neutral-200',
+          tagBg: isDark ? 'bg-zinc-700' : 'bg-neutral-100',
+        });
+
+        // Profile Header Component
+        const ProfileHeader = ({ isDark, pX, pTop }) => {
+          const theme = getTheme(isDark);
+          return (
+            <div className={`sticky top-0 z-20 ${pX} ${pTop} pb-6 border-b transition-colors duration-300 ${isDark ? 'bg-zinc-800/95 border-zinc-700' : 'bg-white/95 border-neutral-100'} backdrop-blur-md`}>
+              <h1 className="text-3xl sm:text-4xl font-bold mb-2 tracking-wider">{lang === 'en' ? 'Sheng Chenliang' : '盛宸亮'}</h1>
+              <p className={`${theme.subtext} text-xs sm:text-sm uppercase tracking-widest mb-6`}>Sheng Chenliang</p>
+              
+              <div className={`space-y-3 text-xs sm:text-sm ${isDark ? 'text-zinc-300' : 'text-neutral-700'}`}>
+                <div className="flex items-center gap-3">
+                  <Icon name="User" size={14} />
+                  <span>{lang === 'en' ? '2004-04 / Male / Han' : '2004-04 / 男 / 汉族'}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Icon name="Phone" size={14} />
+                  <span>17602199148</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Icon name="Mail" size={14} />
+                  <a href="mailto:2023212716@mail.hfut.edu.cn" className="hover:underline transition-colors break-all">
+                    2023212716@mail.hfut.edu.cn
+                  </a>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Icon name="MapPin" size={14} />
+                  <span>{lang === 'en' ? 'Hefei University of Technology' : '合肥工业大学'}</span>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        // Left Page Content 1
+        const LeftPageContent1 = ({ mobile, print }) => {
+          const isDark = (mobile || !print) && !print;
+          const theme = getTheme(isDark);
+          const pX = mobile ? 'px-5' : 'px-10';
+          const pTop = mobile ? 'pt-16' : 'pt-10';
+          
+          return (
+            <div className={`h-full relative overflow-y-auto no-scrollbar ${theme.bg} ${theme.text}`}>
+              <ProfileHeader isDark={isDark} pX={pX} pTop={pTop} />
+              
+              <div className={`${pX} py-8`}>
+                <div className="mb-10">
+                  <h3 className={`text-lg font-semibold uppercase border-b pb-2 mb-4 ${theme.border}`}>
+                    {lang === 'en' ? 'Education' : '教育经历'}
+                  </h3>
+                  <div className="mb-4">
+                    <div className="font-bold text-lg">{lang === 'en' ? 'Hefei University of Technology (211)' : '合肥工业大学 (211)'}</div>
+                    <div className={`${theme.subtext} italic mb-2 text-xs`}>{lang === 'en' ? '2023-09 - Present' : '2023-09 - 至今'}</div>
+                    <div>{lang === 'en' ? 'International Economics and Trade' : '国际经济与贸易 (本科)'}</div>
+                  </div>
+                  
+                  <div className={`text-xs ${theme.subtext} space-y-3 leading-relaxed`}>
+                    <p>
+                      <strong>{lang === 'en' ? 'Core Courses:' : '核心课程：'}</strong> 
+                      {lang === 'en' 
+                        ? ' Money & Banking (98.5), Linear Algebra (95), Political Economy (92), Economic Law, Accounting, Data Mining & MATLAB.'
+                        : ' 货币银行学 (98.5)、线性代数 (95)、政治经济学 (92)、经济法、会计学、数据挖掘与MATLAB应用。'}
+                    </p>
+                    
+                    <div className={`p-3 rounded border ${theme.border} ${isDark ? 'bg-zinc-700/30' : 'bg-neutral-50'}`}>
+                      <strong className="block mb-2 flex items-center gap-2">
+                        <Icon name="Award" size={14} /> {lang === 'en' ? 'Coursera Certifications' : 'Coursera 认证'}
+                      </strong>
+                      <ul className="space-y-2">
+                        <li className="flex justify-between items-start">
+                          <span>Python Basics (Univ. of Michigan)</span>
+                          <a href="https://coursera.org/verify/WJCC5KX00QO3" target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1 opacity-80 hover:opacity-100">
+                            <Icon name="ExternalLink" size={10} />
+                          </a>
+                        </li>
+                        <li className="flex justify-between items-start">
+                          <span>Data Analysis with R</span>
+                          <a href="https://coursera.org/verify/E1X2QWXKPNAF" target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1 opacity-80 hover:opacity-100">
+                            <Icon name="ExternalLink" size={10} />
+                          </a>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className={`text-lg font-semibold uppercase border-b pb-2 mb-4 ${theme.border}`}>
+                    {lang === 'en' ? 'Skills' : '相关技能'}
+                  </h3>
+                  <div className="space-y-4 text-sm">
+                    <div>
+                      <strong className={`block mb-2 ${isDark ? 'text-zinc-300' : 'text-neutral-800'}`}>{lang === 'en' ? 'Software' : '软件技能'}</strong>
+                      <div className="flex flex-wrap gap-2">
+                        {['R', 'Python', 'MATLAB', 'PPT', 'Excel'].map(skill => (
+                          <span key={skill} className={`px-2 py-1 rounded text-xs border ${theme.border} ${theme.tagBg}`}>
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <strong className={`block mb-1 ${isDark ? 'text-zinc-300' : 'text-neutral-800'}`}>{lang === 'en' ? 'Interests' : '兴趣爱好'}</strong>
+                      <p className={`text-xs ${theme.subtext}`}>{lang === 'en' ? 'Long-distance running, Photography, Debate' : '长跑、摄影、辩论'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        // Right Page Content 1
+        const RightPageContent1 = ({ print }) => (
+          <div className={`h-full ${!print ? 'p-5 sm:p-10 overflow-y-auto no-scrollbar' : ''}`}>
+            <Section title={lang === 'en' ? 'Research Experience' : '科研经历'}>
+              <div className="relative border-l-2 border-neutral-200 pl-6 pb-8 last:pb-0 group hover:bg-neutral-50/50 transition-colors rounded-r-lg p-2 -ml-2">
+                <div className="absolute -left-[9px] top-2 w-4 h-4 rounded-full bg-neutral-200 border-2 border-white group-hover:bg-zinc-800 transition-colors"></div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2">
+                  <h3 className="font-bold text-lg leading-tight w-full sm:w-3/4 text-neutral-900">
+                    Contract Design for Repurchasing Computational Power
+                  </h3>
+                  <span className="text-xs font-mono text-neutral-500 mt-1 sm:mt-0 bg-neutral-100 px-2 py-1 rounded">
+                    2024.03 - 2025.05
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="bg-neutral-900 text-white text-[10px] uppercase tracking-wider px-2 py-0.5 rounded">{lang === 'en' ? '2nd Author' : '第二作者'}</span>
+                  <span className="text-xs text-neutral-600 italic">{lang === 'en' ? 'Published in IJTCS-FALL 2025' : '已发表于 IJTCS-FALL 2025'}</span>
+                </div>
+                
+                <div className="text-sm text-neutral-600 space-y-2 mb-3 leading-relaxed">
+                  <p>
+                    <strong className="text-neutral-900">{lang === 'en' ? 'Optimization Model:' : '模型优化：'}</strong>
+                    {lang === 'en' 
+                      ? ' Designed a repurchase mechanism based on contract theory to address low GPU utilization (10-15%) in cloud computing, incentivizing the release of idle power.'
+                      : ' 针对云计算行业 GPU 利用率仅 10-15% 的痛点，构建基于契约理论的回购机制，激励现有客户释放闲置算力并再分配给新需求。'}
+                  </p>
+                  <p>
+                    <strong className="text-neutral-900">{lang === 'en' ? 'Contribution:' : '主要贡献：'}</strong>
+                    {lang === 'en' 
+                      ? ' Authored the Introduction and conducted code reproduction/verification.'
+                      : ' 负责引言撰写与代码复现/验证。'}
+                  </p>
+                </div>
+
+                <a href="https://arxiv.org/abs/2504.14823" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-neutral-900 border-b border-neutral-900 pb-0.5 hover:text-neutral-600 hover:border-neutral-600 transition-colors">
+                  {lang === 'en' ? 'View Paper' : '查看论文'} <Icon name="ExternalLink" size={12} />
+                </a>
+              </div>
+
+              <div className="relative border-l-2 border-neutral-200 pl-6 group hover:bg-neutral-50/50 transition-colors rounded-r-lg p-2 -ml-2">
+                <div className="absolute -left-[9px] top-2 w-4 h-4 rounded-full bg-neutral-200 border-2 border-white group-hover:bg-zinc-800 transition-colors"></div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2">
+                  <h3 className="font-bold text-lg leading-tight w-full sm:w-3/4 text-neutral-900">
+                    {lang === 'en' ? 'Economic Analysis of Antibiotic Treatment Regimens' : '基于两阶段博弈DEA模型的抗生素治疗方案经济效益分析'}
+                  </h3>
+                  <span className="text-xs font-mono text-neutral-500 mt-1 sm:mt-0 bg-neutral-100 px-2 py-1 rounded">
+                    2025.06 - {lang === 'en' ? 'Present' : '至今'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="bg-neutral-900 text-white text-[10px] uppercase tracking-wider px-2 py-0.5 rounded">{lang === 'en' ? '1st Author' : '第一作者'}</span>
+                  <span className="text-xs text-neutral-600 italic">{lang === 'en' ? 'Two-stage Game DEA Model' : '两阶段BCC博弈DEA模型'}</span>
+                </div>
+                
+                <div className="text-sm text-neutral-600 space-y-2 leading-relaxed">
+                  <p>
+                    <strong className="text-neutral-900">{lang === 'en' ? 'Framework:' : '框架设计：'}</strong> 
+                    {lang === 'en' 
+                      ? ' Integrated 7 key indicators (clinical cure rate, length of stay, adverse reaction costs) into a two-stage BCC game DEA model to evaluate 10 antibiotic regimens.'
+                      : ' 将临床治愈率、住院天数、不良反应成本等 7 项关键指标纳入两阶段 BCC 博弈 DEA 模型，把 10 种抗生素方案转化为可比较的效率前沿。'}
+                  </p>
+                  <p>
+                    <strong className="text-neutral-900">{lang === 'en' ? 'Data Insight:' : '数据洞察：'}</strong> 
+                    {lang === 'en' 
+                      ? ' Performed 1,000 Monte Carlo simulations using MATLAB to quantify parameter uncertainty. Identified 3 robust "high-efficacy, low-cost" regimens.'
+                      : ' 用 MATLAB 完成 1,000 次蒙特卡洛模拟，量化参数不确定性，锁定达托霉素等 3 个"高疗效-低成本"稳健方案，为剩余 19 种方案给出 ROI 排序。'}
+                  </p>
+                </div>
+              </div>
+            </Section>
+          </div>
+        );
+
+        // Left Page Content 2
+        const LeftPageContent2 = ({ lightMode, print, mobile }) => {
+          const isDark = (!lightMode && !print);
+          const theme = getTheme(isDark);
+          const pX = mobile ? 'px-5' : 'px-10';
+          const pTop = mobile ? 'pt-16' : 'pt-10';
+
+          return (
+            <div className={`h-full relative overflow-y-auto no-scrollbar ${theme.bg} ${theme.text}`}>
+              <ProfileHeader isDark={isDark} pX={pX} pTop={pTop} />
+
+              <div className={`${pX} py-8`}>
+                <h2 className={`text-xl font-bold tracking-tight uppercase border-b-2 pb-2 mb-6 ${theme.border}`}>
+                  {lang === 'en' ? 'Internship Experience' : '实习经历'}
+                </h2>
+
+                <div className="space-y-8">
+                  <div className="relative">
+                    <div className="flex justify-between items-baseline mb-2">
+                      <h3 className={`font-bold text-lg`}>
+                        {lang === 'en' ? 'Shanghai Univ. of TCM' : '上海中医药大学'}
+                      </h3>
+                      <span className={`text-xs font-mono opacity-60`}>2025.01 - 2025.02</span>
+                    </div>
+                    <div className="mb-3 text-sm font-medium text-blue-400">
+                      {lang === 'en' ? 'Center for Quantitative Pharmacology | Research Assistant' : '药物临床研究中心 | 研究助理'}
+                    </div>
+                    <div className={`text-sm space-y-2 opacity-80 leading-relaxed text-justify`}>
+                      <p>
+                        {lang === 'en' 
+                          ? 'Actively participated in center research activities. Mainly responsible for in-depth review and analysis of pharmacoeconomics literature, refinement of key research methods.'
+                          : '参与中心研究活动。主要负责药物经济学文献的深度综述与分析，关键研究方法的提炼及准确报告。'}
+                      </p>
+                      <p>
+                        {lang === 'en' 
+                          ? 'Demonstrated solid professional knowledge in applying experimental techniques and data analysis methods. Deepened understanding of pharmacoeconomics theoretical knowledge.'
+                          : '在应用实验技术和数据分析方法方面表现出扎实的专业知识。加深了对药物经济学理论知识的理解，积累了宝贵的实践经验。'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className={`relative border-t pt-6 ${theme.border}`}>
+                    <div className="flex justify-between items-baseline mb-2">
+                      <h3 className={`font-bold text-lg`}>
+                        {lang === 'en' ? 'NetEase News' : '网易新闻'}
+                      </h3>
+                      <span className={`text-xs font-mono opacity-60`}>2025.09 - 2025.10</span>
+                    </div>
+                    <div className="mb-3 text-sm font-medium text-red-400">
+                      {lang === 'en' ? 'Content Operations | Project Lead' : '内容运营 | 校园创作者负责人'}
+                    </div>
+                    <div className={`text-sm space-y-2 opacity-80 leading-relaxed text-justify`}>
+                      <p>
+                        {lang === 'en' 
+                          ? 'Participated in the "School Creator" activity organized by NetEase News. Responsible for planning and external dissemination of "NetEase Little Bee" characteristic content.'
+                          : '参与网易新闻举办的"校园创作者"活动。负责"网易小蜜蜂"特色内容的策划与对外传播。'}
+                      </p>
+                      <p>
+                        {lang === 'en' 
+                          ? <span><strong>Achievement:</strong> Independently created multiple high-quality original contents (130k+ total reads, 50k+ single post peak). Awarded "Project Practice Excellence Certificate".</span>
+                          : <span><strong>成果：</strong> 独立创作多条优质原创内容（累计阅读 13w+，单条最高 5w+）。荣获"项目实践优秀证明"。</span>}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        // Right Page Content 2
+        const RightPageContent2 = ({ print }) => (
+          <div className={`h-full ${!print ? 'p-5 sm:p-10 overflow-y-auto no-scrollbar' : ''}`}>
+            <Section title={lang === 'en' ? 'Campus Experience' : '校园经历'}>
+              <div className="space-y-6">
+                <div className="group">
+                  <div className="flex justify-between items-baseline mb-1">
+                    <h3 className="font-bold text-lg group-hover:text-blue-600 transition-colors">
+                      {lang === 'en' ? 'School New Media Center' : '经济学院新媒体中心运营部'}
+                    </h3>
+                    <span className="text-sm text-neutral-500">{lang === 'en' ? 'Director' : '负责人'}</span>
+                  </div>
+                  <div className="text-sm text-neutral-600 space-y-1">
+                    <p>• <strong>{lang === 'en' ? 'Operations:' : '平台运营：'}</strong> {lang === 'en' ? 'Managed official accounts. Published 100+ posts with 100k+ total reads.' : '运营学院官方公众号/视频号。累计发布推文 100+，阅读量 10万+。'}</p>
+                    <p>• <strong>{lang === 'en' ? 'Impact:' : '内容策划：'}</strong> {lang === 'en' ? "Led the center to rank 1st in the university's online political education assessment." : '助力中心获全校网络思政教育考核第一。'}</p>
+                  </div>
+                </div>
+
+                <div className="group">
+                  <div className="flex justify-between items-baseline mb-1">
+                    <h3 className="font-bold text-lg group-hover:text-blue-600 transition-colors">
+                      {lang === 'en' ? 'Speech & Debate Association' : '演讲与口才协会辩论队'}
+                    </h3>
+                    <span className="text-sm text-neutral-500">{lang === 'en' ? 'Team Leader' : '负责人'}</span>
+                  </div>
+                  <div className="text-sm text-neutral-600 space-y-1">
+                    <p>• <strong>{lang === 'en' ? 'Honors:' : '荣誉：'}</strong> {lang === 'en' ? 'University Debate Champion (vs 20 teams), "Capybara Cup" Online Debate Champion & Best Debater (vs 48 teams).' : '合肥工业大学校辩论赛冠军（20队）、卡皮巴拉杯网络辩论赛冠军暨单场最佳辩手（48队）。'}</p>
+                    <p>• <strong>{lang === 'en' ? 'Leadership:' : '队伍建设：'}</strong> {lang === 'en' ? 'Trained 100+ members in argumentation and research skills.' : '负责技能培训，指导立论与资料搜索，培训人数 100+。'}</p>
+                  </div>
+                </div>
+              </div>
+            </Section>
+
+            <Section title={lang === 'en' ? 'Certificates & Awards' : '荣誉证书'} className="mb-0">
+              <div className="grid grid-cols-1 gap-4">
+                <div className="border border-neutral-200 rounded p-3 bg-white hover:border-black transition-colors">
+                  <div className="flex flex-col gap-1">
+                    <h4 className="font-bold text-sm leading-tight">
+                      {lang === 'en' 
+                        ? "Anhui College Students Int'l Trade Comprehensive Skills Competition - First Prize" 
+                        : '安徽省大学生国际贸易综合技能大赛 - 一等奖'}
+                    </h4>
+                    <div className="flex justify-between items-end mt-1 text-xs text-neutral-500">
+                      <span>{lang === 'en' ? 'Dept. of Education of Anhui' : '安徽省教育厅'} • Feb 2025</span>
+                      <span className="bg-neutral-100 text-neutral-700 px-1.5 py-0.5 rounded">
+                        {lang === 'en' ? 'Team Member (2nd)' : '团队成员 (第二顺位)'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border border-neutral-200 rounded p-3 bg-white hover:border-black transition-colors">
+                  <div className="flex flex-col gap-1">
+                    <h4 className="font-bold text-sm leading-tight">
+                      {lang === 'en' 
+                        ? "The 8th Anhui College Students Int'l Business Simulated Negotiation Competition - First Prize" 
+                        : '第八届安徽省大学生国际商务模拟谈判大赛 - 一等奖'}
+                    </h4>
+                    <div className="flex justify-between items-end mt-1 text-xs text-neutral-500">
+                      <span>{lang === 'en' ? 'Dept. of Education of Anhui' : '安徽省教育厅'} • Dec 2025</span>
+                      <span className="bg-neutral-100 text-neutral-700 px-1.5 py-0.5 rounded">
+                        {lang === 'en' ? 'Team Member (2nd)' : '团队成员 (第二顺位)'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border border-neutral-200 rounded p-4 bg-neutral-50 hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h4 className="font-bold text-neutral-900">IELTS Academic</h4>
+                      <span className="text-xs text-neutral-500">Dec 21, 2025</span>
+                    </div>
+                    <div className="bg-black text-white text-xs font-bold px-2 py-1 rounded">
+                      7.0
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 text-center text-xs text-neutral-600 mt-2 border-t border-neutral-200 pt-2">
+                    <div><span className="block font-bold">8.0</span>R</div>
+                    <div><span className="block font-bold">7.0</span>L</div>
+                    <div><span className="block font-bold">6.5</span>S</div>
+                    <div><span className="block font-bold">6.5</span>W</div>
+                  </div>
+                </div>
+
+                <div className="border border-neutral-200 rounded p-4">
+                  <ul className="space-y-3 text-sm">
+                    <li className="flex items-start gap-2">
+                      <Icon name="Award" size={16} className="mt-0.5 text-yellow-600 shrink-0" />
+                      <span>
+                        <strong className="block text-neutral-900">{lang === 'en' ? 'Project Practice Excellence Award' : '项目实践优秀证明'}</strong>
+                        <span className="text-neutral-500 text-xs">{lang === 'en' ? 'NetEase News • Oct 2025' : '网易新闻 • 2025.10'}</span>
+                      </span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </Section>
+          </div>
+        );
+
+        return (
+          <>
+            {/* Screen View */}
+            <div className="min-h-screen flowing-bg flex items-center justify-center p-2 sm:p-8 overflow-hidden relative no-print">
+              
+              {/* Mobile Notice */}
+              <div className="lg:hidden absolute top-4 left-4 right-4 bg-white/90 p-3 rounded shadow text-[10px] text-center z-40 backdrop-blur-sm">
+                {lang === 'en' ? 'Swipe or scroll to view full resume.' : '建议在桌面端浏览获得翻页体验，手机端可直接下滑。'}
+              </div>
+
+              {/* Top Controls */}
+              <div className="absolute top-4 right-4 sm:top-8 sm:right-8 z-50 flex gap-2 sm:gap-3">
+                <button 
+                  onClick={handlePrint}
+                  className="flex items-center gap-2 bg-white text-black px-3 py-1.5 sm:px-4 sm:py-2 rounded-full shadow-lg hover:scale-105 transition-transform font-bold text-xs sm:text-sm"
+                >
+                  <Icon name="Download" size={14} />
+                  {lang === 'en' ? 'PDF' : '导出'}
+                </button>
+                <button 
+                  onClick={toggleLang}
+                  className="flex items-center gap-2 bg-black text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-full shadow-lg hover:scale-105 transition-transform font-bold text-xs sm:text-sm"
+                >
+                  <Icon name="Globe" size={14} />
+                  {lang === 'en' ? 'CN' : 'EN'}
+                </button>
+              </div>
+
+              {/* Book Container */}
+              <div className="relative w-full max-w-6xl h-[90vh] sm:h-[85vh] flex shadow-2xl rounded-lg overflow-hidden bg-zinc-800 transition-all duration-500">
+                
+                {/* Left Side (Desktop) */}
+                <div className="w-1/2 h-full bg-zinc-800 text-white relative z-0 hidden lg:block border-r border-zinc-700">
+                  {currentPage === 0 ? <LeftPageContent1 /> : <LeftPageContent2 />}
+                </div>
+
+                {/* Right Side (Desktop) */}
+                <div className="w-1/2 h-full bg-white text-neutral-900 relative z-0 hidden lg:block">
+                  {currentPage === 0 ? <RightPageContent1 /> : <RightPageContent2 />}
+                </div>
+
+                {/* Mobile View */}
+                <div className="lg:hidden w-full h-full bg-white overflow-y-auto scroll-smooth">
+                  <div className="min-h-[90vh] flex flex-col">
+                    <LeftPageContent1 mobile />
+                  </div>
+                  <div className="p-4"><RightPageContent1 /></div>
+                  <div className="p-0 bg-neutral-50"><LeftPageContent2 lightMode mobile /></div>
+                  <div className="p-4"><RightPageContent2 /></div>
+                </div>
+
+                {/* Navigation Controls */}
+                <div className="hidden lg:flex absolute bottom-8 left-0 right-0 justify-center gap-8 z-40 pointer-events-none">
+                  <button 
+                    onClick={prevPage}
+                    disabled={currentPage === 0}
+                    className={`pointer-events-auto flex items-center gap-2 px-6 py-2 rounded-full backdrop-blur-md transition-all ${
+                      currentPage === 0 
+                        ? 'bg-white/10 text-white/20 cursor-not-allowed' 
+                        : 'bg-white/20 text-white hover:bg-white/30 hover:scale-105 shadow-lg'
+                    }`}
+                  >
+                    <Icon name="ChevronLeft" size={20} /> {lang === 'en' ? 'Previous' : '上一页'}
+                  </button>
+                  <span className="text-white/40 font-mono text-sm self-center">
+                    {currentPage + 1} / 2
+                  </span>
+                  <button 
+                    onClick={nextPage}
+                    disabled={currentPage === 1}
+                    className={`pointer-events-auto flex items-center gap-2 px-6 py-2 rounded-full backdrop-blur-md transition-all ${
+                      currentPage === 1 
+                        ? 'bg-black/10 text-black/20 cursor-not-allowed' 
+                        : 'bg-zinc-800/10 text-zinc-900 hover:bg-zinc-800/20 hover:scale-105 shadow-lg border border-neutral-200'
+                    }`}
+                  >
+                    {lang === 'en' ? 'Next' : '下一页'} <Icon name="ChevronRight" size={20} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Print View */}
+            <div className="print-only max-w-[21cm] mx-auto p-8">
+              <div className="grid grid-cols-2 gap-8 border-b border-neutral-200 pb-8 mb-8">
+                <LeftPageContent1 print />
+                <div className="pt-12"><RightPageContent1 print /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-8">
+                <LeftPageContent2 print />
+                <RightPageContent2 print />
+              </div>
+            </div>
+
+            {/* AI Chat Widget */}
+            <AIChatWidget lang={lang} />
+          </>
+        );
+      };
+
+      // Mount the app
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
